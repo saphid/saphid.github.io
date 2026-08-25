@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="How the T3 Code performance harness attributes GPU work, ranks release outliers, and avoids misleading comparisons across Mac and Linux workers." />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="Alex Southwell" />
+  <meta property="og:title" content="What a GPU outlier actually means" />
+  <meta property="og:description" content="A field guide to the release-by-release T3 Code graphics test—and the places its numbers can lie." />
+  <meta name="twitter:card" content="summary" />
+  <title>What a GPU outlier actually means / Alex Southwell</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/theme.js"></script>
+</head>
+<body>
+  <div class="grid-pattern"></div>
+  <div class="shell"><div class="wrap"><main class="article">
+    <div class="topbar"><a class="back-link" href="/">← home</a><button class="theme-button" data-theme-toggle type="button">theme</button></div>
+
+    <header class="article-header">
+      <p class="kicker">Performance field note · 25 August 2026</p>
+      <h1>What a GPU outlier actually means.</h1>
+      <p class="lede">A chart said a text-heavy coding app was burning GPU time. I wanted to know whether that meant a real regression, a noisy machine, or a measurement pretending to be more certain than it was.</p>
+      <div class="article-meta"><span>Alex Southwell</span><span>6 minute read</span><span>Measured across T3 Code releases</span></div>
+    </header>
+
+    <article class="article-body">
+      <p>The short answer: our “GPU outliers” page is a triage view. It ranks the worst graphics cost seen for each tested feature in the selected releases. It is not a statistical anomaly detector, and it is definitely not one universal number that can be compared across every machine.</p>
+
+      <div class="metric-strip" role="group" aria-label="GPU test thresholds">
+        <div><span class="metric-value">≤10</span><span class="metric-label">GPU-ms per wall second<br />expected band</span></div>
+        <div><span class="metric-value">50</span><span class="metric-label">investigate<br />a sensitive dashboard marker</span></div>
+        <div><span class="metric-value">&gt;100</span><span class="metric-label">poor band<br />in the harness report</span></div>
+      </div>
+
+      <h2>The workload is a feature, not a shader demo</h2>
+      <p>The cleanest reproduction is <code>scroll-giant-thread</code>. The harness opens a large seeded conversation, places the pointer over the message pane, and alternates 600-pixel wheel events every 50 milliseconds for five seconds. That exercises the thing we care about: T3 Code rendering a realistic, large timeline under sustained input. Playwright documents that <a href="https://playwright.dev/docs/api/class-mouse#mouse-wheel">wheel events are dispatched without waiting for scrolling to finish</a>, so the test is intentionally continuous rather than scroll, settle, repeat.</p>
+      <p>The same measurement window wraps other expensive product paths—streaming assistant output, a 10,000-line terminal burst, and Electron picture-in-picture capture. The dashboard can therefore answer “which feature and release made the graphics path work hardest?” The scrolling test is simply the controlled place to reproduce a finding.</p>
+
+      <h2>Two signals that must not be mixed</h2>
+      <div class="method-map">
+        <p><strong>GPU busy time</strong> is attributed work in the Chromium GPU process, normalized to one wall second.</p>
+        <p><strong>GPU-helper CPU</strong> is CPU time burned by that same helper. On software-rendered Linux, this is the honest rendering-cost signal.</p>
+      </div>
+      <p>Chromium deliberately puts raster and compositor work into a dedicated GPU process; its architecture notes say the graphics-driver calls happen there. The harness discovers that typed process through the <a href="https://chromedevtools.github.io/devtools-protocol/tot/SystemInfo/#method-getProcessInfo">Chrome DevTools Protocol</a>, or through Electron’s documented <a href="https://www.electronjs.org/docs/latest/api/app#appgetappmetrics"><code>app.getAppMetrics()</code></a>. That process boundary is useful because it follows the app’s graphics work rather than whole-machine activity.</p>
+      <p>The normalization is deliberately plain: 250 milliseconds of attributed GPU work during a five-second action is 50 GPU-ms/s. Each scenario normally runs five measured repetitions; reused environments get an unrecorded warm-up first. Grafana shows their median; the harness report grades the p75, which is less forgiving of an intermittently expensive run.</p>
+
+      <h2>Same hardware does not mean same sensor</h2>
+      <p>The fleet has two human-readable device types: a MacBook Pro and three identical Intel i7-8700 Linux workers. That is the right level for ordinary performance comparisons. GPU measurement adds another dimension, <code>gpu_backend</code>, because the machines do not all expose the same counters.</p>
+      <ul>
+        <li><strong>MacBook Pro / AGX:</strong> the harness samples cumulative Apple Silicon GPU counters from the I/O Registry. Apple documents the <a href="https://developer.apple.com/library/archive/documentation/DeviceDrivers/Conceptual/IOKitFundamentals/TheRegistry/TheRegistry.html">I/O Registry</a>, but not these particular AGX accounting fields as a stable public API. This is measured and useful, but version-sensitive.</li>
+        <li><strong>Linux / DRM fdinfo:</strong> when the driver exposes it, the harness reads per-client <code>drm-engine-*</code> busy-time counters. The <a href="https://docs.kernel.org/gpu/drm-usage-stats.html">Linux kernel specification</a> defines those fields and warns that driver support is optional.</li>
+        <li><strong>Linux / no GPU attribution:</strong> a zero GPU-busy value means “unavailable,” not necessarily “free.” The dashboard excludes those zeros from GPU-busy comparisons and uses GPU-helper CPU instead.</li>
+        <li><strong>NVIDIA fallback:</strong> where available, <a href="https://docs.nvidia.com/deploy/nvidia-smi/index.html#process-monitoring"><code>nvidia-smi pmon</code></a> provides sampled per-process SM utilization. That is an estimate, not the same precision as a cumulative busy-time counter.</li>
+      </ul>
+
+      <div class="callout">
+        <p><strong>The practical rule:</strong> compare adjacent releases for the same scenario, surface, device type, and measurement backend. Do not average AGX, DRM, an NVIDIA estimate, and an unavailable counter into one confident-looking line.</p>
+      </div>
+
+      <h2>Why “outlier” needs scare quotes</h2>
+      <p>The ranking panel selects each release’s median result, averages identical workers within that release, keeps the worst value within the chosen time range, and sorts descending. The dashboard opens on the last seven days. Prometheus’s <a href="https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time"><code>last_over_time</code></a> recovers the point for each release series; the surrounding aggregation chooses the worst release. There is no z-score, interquartile range, or median absolute deviation.</p>
+      <p>That makes the panel useful for finding where to look, but a single tall bar is not a verdict. A sustained step across adjacent releases is stronger evidence. So is a matching increase in dropped frames or wall time. The next move is to rerun the exact combination and inspect its individual samples before assigning a cause.</p>
+
+      <h2>The thresholds are heuristics</h2>
+      <p>The harness explicitly calls its graphics bands derived rather than vendor standards. At or below 10 GPU-ms/s is the expected band for this mostly-text interface. The dashboard’s 50 ms/s line is an early “investigate this” marker. The report’s poor band begins above 100 ms/s. Neither threshold is an Apple, Chromium, Electron, Linux, or NVIDIA conformance limit.</p>
+      <p>That distinction matters. The goal is not to manufacture a red alert. It is to make a release regression obvious early enough that someone can reproduce it, find the render loop or repaint that changed, and fix it before a coding tool quietly taxes its user all day.</p>
+
+      <h2>How I read the dashboard now</h2>
+      <ol>
+        <li>Choose one device type and confirm the GPU measurement backend.</li>
+        <li>Start with “worst cost seen in range” to find a feature worth opening.</li>
+        <li>Use the build timeline to find the first release where the step appears.</li>
+        <li>Check GPU-helper CPU, dropped frames, and wall time before calling it user-visible.</li>
+        <li>Rerun the suspicious release and scenario; treat one isolated point as a lead, not proof.</li>
+      </ol>
+
+      <h2>Sources and implementation notes</h2>
+      <ul class="sources">
+        <li>Chromium, <a href="https://chromium.googlesource.com/graphics-book/+/refs/heads/main/src/chrome-architecture--processes-threads.md">Processes and Threads</a> and <a href="https://chromium.googlesource.com/chromium/src/+/master/docs/gpu/debugging_gpu_related_code.md">Debugging GPU-related code</a></li>
+        <li>Chrome DevTools Protocol, <a href="https://chromedevtools.github.io/devtools-protocol/tot/SystemInfo/">SystemInfo domain</a></li>
+        <li>Electron, <a href="https://www.electronjs.org/docs/latest/tutorial/process-model">Process Model</a> and <a href="https://www.electronjs.org/docs/latest/api/structures/process-metric">ProcessMetric</a></li>
+        <li>Apple, <a href="https://developer.apple.com/library/archive/documentation/DeviceDrivers/Conceptual/IOKitFundamentals/TheRegistry/TheRegistry.html">The I/O Registry</a></li>
+        <li>Linux kernel, <a href="https://docs.kernel.org/gpu/drm-usage-stats.html">DRM client usage stats</a></li>
+        <li>NVIDIA, <a href="https://docs.nvidia.com/deploy/nvidia-smi/index.html#process-monitoring">Process Monitoring</a></li>
+        <li>Playwright, <a href="https://playwright.dev/docs/api/class-mouse#mouse-wheel"><code>mouse.wheel</code></a></li>
+        <li>Prometheus, <a href="https://prometheus.io/docs/prometheus/latest/querying/functions/">Query functions</a></li>
+      </ul>
+
+      <footer class="article-footer">
+        <p>The live charts are on <a href="https://stats.t3play.dev/d/t3perf-gpu-outliers">stats.t3play.dev</a> for enrolled testers. The operational dashboard keeps individual worker hosts visible; analytical views group the three identical Linux boxes as one device type while retaining the measurement backend.</p>
+      </footer>
+    </article>
+  </main></div></div>
+</body>
+</html>

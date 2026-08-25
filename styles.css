@@ -159,3 +159,36 @@ p { line-height: 1.65; }
 
 @keyframes fade-in-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .wrap { animation: none; } .resource-card, .socials a { transition: none; } }
+
+/* Long-form field notes: narrow reading measure inside the site's industrial shell. */
+.article { max-width: 54rem; }
+.article-header { margin-bottom: 2rem; }
+.article h1 { max-width: 12ch; font-size: clamp(3rem, 9vw, 6.4rem); }
+.article .lede { max-width: 42rem; font-size: clamp(1.1rem, 2vw, 1.35rem); line-height: 1.55; }
+.article-meta { display: flex; flex-wrap: wrap; gap: .55rem 1rem; color: var(--text-subtle); font-size: .84rem; }
+.article-body { max-width: 44rem; }
+.article-body h2 { margin-top: 3.4rem; font-size: clamp(1.6rem, 4vw, 2.35rem); }
+.article-body h3 { margin-top: 2rem; font-size: 1.15rem; }
+.article-body p, .article-body li { font-size: 1.02rem; line-height: 1.78; }
+.article-body ul, .article-body ol { padding-left: 1.25rem; }
+.article-body li + li { margin-top: .55rem; }
+.article-body a { color: var(--text); text-underline-offset: .2em; text-decoration-color: var(--border-strong); }
+.article-body a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+.metric-strip { display: grid; grid-template-columns: repeat(3, 1fr); margin: 2.2rem 0; border: 1px solid var(--border-strong); }
+.metric-strip > div { padding: 1rem; min-height: 7.5rem; background: color-mix(in srgb, var(--surface) 68%, transparent); }
+.metric-strip > div + div { border-left: 1px solid var(--border-strong); }
+.metric-value { display: block; color: var(--text); font-size: clamp(2rem, 7vw, 3.5rem); font-weight: 800; letter-spacing: -.06em; }
+.metric-label { display: block; margin-top: .4rem; color: var(--text-subtle); font-size: .8rem; line-height: 1.35; text-transform: uppercase; letter-spacing: .08em; }
+.method-map { margin: 2rem 0; border-left: 3px solid var(--accent); padding: .25rem 0 .25rem 1.25rem; }
+.method-map strong { color: var(--text); }
+.callout { margin: 2rem 0; padding: 1.25rem; border: 1px solid var(--border-strong); background: var(--surface-elevated); }
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+.sources { font-size: .9rem; color: var(--text-subtle); }
+.sources li { font-size: .9rem; }
+.article-footer { margin-top: 3.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); color: var(--text-subtle); }
+@media (max-width: 640px) {
+  .metric-strip { grid-template-columns: 1fr; }
+  .metric-strip > div { min-height: 0; }
+  .metric-strip > div + div { border-left: 0; border-top: 1px solid var(--border-strong); }
+}
