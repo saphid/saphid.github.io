@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Pinging an idle coding-agent thread before its prompt cache expires would have cut my Claude bill by 12% over two weeks." />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="Alex Southwell" />
+  <meta property="og:title" content="Keep the cache warm" />
+  <meta property="og:description" content="What prompt-cache keep-alives would have saved on two weeks of real Claude Code and Codex use." />
+  <meta name="twitter:card" content="summary" />
+  <title>Keep the cache warm / Alex Southwell</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/theme.js"></script>
+</head>
+<body>
+  <div class="grid-pattern"></div>
+  <div class="shell"><div class="wrap"><main class="article">
+    <div class="topbar"><a class="back-link" href="/">← home</a><button class="theme-button" data-theme-toggle type="button">theme</button></div>
+
+    <header class="article-header">
+      <p class="kicker">Cost field note · 24 September 2026</p>
+      <h1>Keep the cache warm.</h1>
+      <p class="lede">Coding agents build huge contexts. Then you go to lunch, the prompt cache expires, and your next message pays to write the whole thing again.</p>
+      <div class="article-meta"><span>Alex Southwell</span><span>3 minute read</span><span>Two weeks of real transcripts</span></div>
+    </header>
+
+    <article class="article-body">
+      <figure class="chart"><svg viewBox="0 0 1000 540" role="img" aria-label="Same thread with and without keep-alive pings"><text x="20" y="100" class="lbl strong" text-anchor="start">Without keep-alive</text><line x1="20" y1="170" x2="980" y2="170" class="axis"/><rect x="20.0" y="135" width="70.0" height="70" rx="4" class="s-neutral"><title>Working turn</title></rect><text x="55" y="245" class="lbl sub" text-anchor="middle">turn</text><rect x="880.0" y="70" width="100.0" height="200" rx="4" class="s-2"><title>You come back: the cache expired, whole prefix rewritten at 2x input</title></rect><text x="860" y="110" class="lbl s2" text-anchor="end">back: full rewrite</text><text x="20" y="320" class="lbl strong" text-anchor="start">With keep-alive</text><line x1="20" y1="390" x2="980" y2="390" class="axis"/><rect x="20.0" y="355" width="70.0" height="70" rx="4" class="s-neutral"><title>Working turn</title></rect><text x="55" y="465" class="lbl sub" text-anchor="middle">turn</text><rect x="354.0" y="385" width="12.0" height="10" rx="4" class="s-1"><title>Ping: a cache read at 0.1x input</title></rect><text x="360" y="465" class="lbl s1" text-anchor="middle">ping</text><rect x="634.0" y="385" width="12.0" height="10" rx="4" class="s-1"><title>Ping: a cache read at 0.1x input</title></rect><text x="640" y="465" class="lbl s1" text-anchor="middle">ping</text><rect x="880.0" y="385" width="100.0" height="10" rx="4" class="s-1"><title>You come back: the prefix is still cached, 0.1x input</title></rect><text x="980" y="465" class="lbl s1" text-anchor="end">back: cheap read</text><text x="20" y="530" class="lbl sub" text-anchor="start">Bar height is cost. 2 hours idle, 193k-token context.</text></svg></figure>
+      <p>The fix is a keep-alive. Just before the cache expires, resend the thread's last request byte for byte, with <code>max_tokens: 0</code>. You get no answer back. The provider reads the cached prefix, and that read resets the expiry clock.</p>
+
+      <h2>When it pays</h2>
+      <p>Every ping is a cache read. At some point the pings add up to more than the rewrite they're preventing. Context size cancels out, so the break-even point depends only on the price ratio and how often you ping.</p>
+      <figure class="chart"><svg viewBox="0 0 1000 380" role="img" aria-label="Break-even idle time: 46 minutes for Claude 5-minute cache, 5.4 hours for GPT-6, 17 hours for Claude 1-hour cache"><line x1="330.0" y1="10" x2="330.0" y2="330" class="grid"/><text x="330.0" y="365" class="lbl sub" text-anchor="middle">0 h</text><line x1="516.6666666666666" y1="10" x2="516.6666666666666" y2="330" class="grid"/><text x="516.6666666666666" y="365" class="lbl sub" text-anchor="middle">6 h</text><line x1="703.3333333333333" y1="10" x2="703.3333333333333" y2="330" class="grid"/><text x="703.3333333333333" y="365" class="lbl sub" text-anchor="middle">12 h</text><line x1="890.0" y1="10" x2="890.0" y2="330" class="grid"/><text x="890.0" y="365" class="lbl sub" text-anchor="middle">18 h</text><text x="310" y="70" class="lbl" text-anchor="end">Claude, 5-min cache</text><rect x="330.0" y="30" width="24.0" height="56" rx="4" class="s-1"><title>Claude, 5-min cache: pings stop paying off after 46 min idle</title></rect><text x="367.9555555555556" y="70" class="lbl strong" text-anchor="start">46 min</text><text x="310" y="170" class="lbl" text-anchor="end">GPT-6, 30-min cache</text><rect x="330.0" y="130" width="168.0" height="56" rx="4" class="s-1"><title>GPT-6, 30-min cache: pings stop paying off after 5.4 h idle</title></rect><text x="512.0" y="170" class="lbl strong" text-anchor="start">5.4 h</text><text x="310" y="270" class="lbl" text-anchor="end">Claude, 1-hour cache</text><rect x="330.0" y="230" width="541.3" height="56" rx="4" class="s-1"><title>Claude, 1-hour cache: pings stop paying off after 17 h idle</title></rect><text x="885.3333333333333" y="270" class="lbl strong" text-anchor="start">17 h</text></svg></figure>
+      <p>So a keep-alive needs a cutoff. Past it, stop pinging and take the cold write.</p>
+
+      <h2>What it would have saved</h2>
+      <p>I replayed two weeks of my own Claude Code and Codex transcripts, September 9 to 23, with a 24-hour cutoff.</p>
+      <figure class="chart"><svg viewBox="0 0 1000 330" role="img" aria-label="Keep-alive would have saved $336 of $2,802 in Claude spend"><text x="20" y="60" class="big s1" text-anchor="start">$336 saved</text><text x="980" y="60" class="lbl sub" text-anchor="end">$2,466 still spent</text><rect x="20.0" y="90" width="113.0" height="110" rx="4" class="s-1"><title>Saved by keep-alive: $335.68</title></rect><rect x="137.0" y="90" width="843.0" height="110" rx="4" class="s-track"><title>Still spent: $2,466</title></rect><text x="20" y="260" class="lbl strong" text-anchor="start">12% of Claude spend, from 92 cache expiries</text><text x="20" y="305" class="lbl sub" text-anchor="start">Perfect foresight: $343. Codex on the same data: $8.73.</text></svg></figure>
+      <p>Most of the saving came from a few long engineering threads with contexts of several hundred thousand tokens, left idle for one to four hours. Codex barely moved. Its contexts are cheaper and I'm on a flat-rate plan, so even the $8.73 is a rate-card figure, not money I'd get back.</p>
+
+      <h2>Don't just lengthen the cache</h2>
+      <p>Claude offers a 1-hour cache, but writing to it costs 2x input instead of 1.25x. Every new token in a growing thread pays that higher price. Forcing one cache length on everything made spend go up.</p>
+      <figure class="chart"><svg viewBox="0 0 1000 380" role="img" aria-label="Change in two-week Claude spend: today's mix plus pings saves $336, 1-hour everywhere costs $24 more, 5-minute everywhere costs $205 more"><line x1="560" y1="10" x2="560" y2="330" class="axis-strong"/><text x="560" y="365" class="lbl sub" text-anchor="middle">$0</text><rect x="140.0" y="30" width="420.0" height="56" rx="4" class="s-1"><title>Today's mix + pings: $336 less</title></rect><text x="126.0" y="70" class="lbl strong" text-anchor="end">-$336</text><text x="580" y="70" class="lbl" text-anchor="start">Today's mix + pings</text><rect x="560.0" y="130" width="30.0" height="56" rx="4" class="s-2"><title>1-hour everywhere + pings: $24 more</title></rect><text x="604.0" y="170" class="lbl strong" text-anchor="start">+$24</text><text x="540" y="170" class="lbl" text-anchor="end">1-hour everywhere + pings</text><rect x="560.0" y="230" width="256.2" height="56" rx="4" class="s-2"><title>5-min everywhere + pings: $205 more</title></rect><text x="830.25" y="270" class="lbl strong" text-anchor="start">+$205</text><text x="540" y="270" class="lbl" text-anchor="end">5-min everywhere + pings</text></svg></figure>
+
+      <h2>What pings can't fix</h2>
+      <p>A ping keeps the old prefix alive. It can't help once the prefix itself changes, whether from compaction, an edited system prompt, a model switch, or new tool definitions. In my data that was the small slice.</p>
+      <figure class="chart"><svg viewBox="0 0 1000 280" role="img" aria-label="Claude cache-write dollars: 38% expired while idle, 3.5% invalidated, 58.5% everything else"><rect x="20.0" y="20" width="361.8" height="130" rx="4" class="s-1"><title>38% expired while idle: pings fix most of this</title></rect><text x="20" y="215" class="lbl strong" text-anchor="start">38% expired while idle</text><text x="20" y="258" class="lbl sub" text-anchor="start">pings fix most of this</text><rect x="384.8" y="20" width="30.6" height="130" rx="4" class="s-2"><title>3.5% invalidated: pings can't help</title></rect><text x="440" y="215" class="lbl strong" text-anchor="middle">3.5% invalidated</text><text x="440" y="258" class="lbl sub" text-anchor="middle">pings can't help</text><rect x="418.4" y="20" width="558.6" height="130" rx="4" class="s-track"><title>58.5% everything else: mostly new context</title></rect><text x="980" y="215" class="lbl strong" text-anchor="end">58.5% everything else</text><text x="980" y="258" class="lbl sub" text-anchor="end">mostly new context</text><line x1="402" y1="155" x2="440" y2="180" class="axis-strong"/></svg></figure>
+
+      <h2>Building it</h2>
+      <ul>
+        <li>Save the exact bytes of each idle thread's last request.</li>
+        <li>Replay them just before expiry, asking for zero output.</li>
+        <li>Stop at the break-even cutoff, and skip contexts too small to be worth it.</li>
+        <li>Keep pings out of thread history. They're cache traffic, not turns.</li>
+        <li>Log each miss as expiry or invalidation, so you tune the right thing.</li>
+      </ul>
+      <p>For a big thread you come back to after lunch, a few cents of pings saves a few dollars of rewrite.</p>
+
+      <footer class="article-footer">
+        <p>Claude figures are estimated cash cost. Codex figures use API list prices. Break-even assumes reads at 0.1x input, writes at 1.25x (5-minute and OpenAI) or 2x (1-hour), and pings every 4, 28, and 55 minutes. Hover any bar for its value.</p>
+      </footer>
+    </article>
+  </main></div></div>
+</body>
+</html>

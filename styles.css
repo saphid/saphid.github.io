@@ -192,3 +192,24 @@ p { line-height: 1.65; }
   .metric-strip > div { min-height: 0; }
   .metric-strip > div + div { border-left: 0; border-top: 1px solid var(--border-strong); }
 }
+
+/* Inline SVG charts in field notes. Series colors follow the theme. */
+:root { --series-1: #3987e5; --series-2: #d95926; --track: #ffffff1c; }
+html[data-theme="light"] { --series-1: #2a78d6; --series-2: #eb6834; --track: #0b0d1014; }
+.chart { margin: 2rem 0; }
+.chart svg { display: block; width: 100%; height: auto; font-family: inherit; }
+.chart .lbl { font-size: 26px; fill: var(--text); }
+.chart .strong { font-weight: 700; }
+.chart .sub { fill: var(--text-subtle); }
+.chart .big { font-size: 52px; font-weight: 800; }
+.chart .on-fill { fill: #fff; }
+.chart .s1 { fill: var(--series-1); }
+.chart .s2 { fill: var(--series-2); }
+.chart .s-1 { fill: var(--series-1); }
+.chart .s-2 { fill: var(--series-2); }
+.chart .s-neutral { fill: var(--text-subtle); }
+.chart .s-track { fill: var(--track); }
+.chart .grid { stroke: var(--border); stroke-width: 1; }
+.chart .axis { stroke: var(--border-strong); stroke-width: 2; }
+.chart .axis-strong { stroke: var(--text-subtle); stroke-width: 2; }
+.chart rect:hover { opacity: .85; }
