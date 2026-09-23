@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Pinging an idle coding-agent thread before its prompt cache expires would have cut my Claude bill by 12% over two weeks." />
+  <meta name="description" content="Pinging an idle coding-agent thread before its prompt cache expires would have cut my Claude cache spend by 7% over two weeks, with the right cutoff." />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="Alex Southwell" />
   <meta property="og:title" content="Keep the cache warm" />
-  <meta property="og:description" content="What prompt-cache keep-alives would have saved on two weeks of real Claude Code and Codex use." />
+  <meta property="og:description" content="What prompt-cache keep-alives would have saved on two weeks of real Claude Code use, and why the cutoff matters more than the ping." />
   <meta name="twitter:card" content="summary" />
   <title>Keep the cache warm / Alex Southwell</title>
   <link rel="stylesheet" href="/styles.css" />
@@ -22,45 +22,228 @@
       <p class="kicker">Cost field note · 24 September 2026</p>
       <h1>Keep the cache warm.</h1>
       <p class="lede">Coding agents build huge contexts. Then you go to lunch, the prompt cache expires, and your next message pays to write the whole thing again.</p>
-      <div class="article-meta"><span>Alex Southwell</span><span>3 minute read</span><span>Two weeks of real transcripts</span></div>
+      <div class="article-meta"><span>Alex Southwell</span><span>4 minute read</span><span>Two weeks of real transcripts</span></div>
     </header>
 
     <article class="article-body">
-      <figure class="chart"><svg viewBox="0 0 1000 540" role="img" aria-label="Same thread with and without keep-alive pings"><text x="20" y="100" class="lbl strong" text-anchor="start">Without keep-alive</text><line x1="20" y1="170" x2="980" y2="170" class="axis"/><rect x="20.0" y="135" width="70.0" height="70" rx="4" class="s-neutral"><title>Working turn</title></rect><text x="55" y="245" class="lbl sub" text-anchor="middle">turn</text><rect x="880.0" y="70" width="100.0" height="200" rx="4" class="s-2"><title>You come back: the cache expired, whole prefix rewritten at 2x input</title></rect><text x="860" y="110" class="lbl s2" text-anchor="end">back: full rewrite</text><text x="20" y="320" class="lbl strong" text-anchor="start">With keep-alive</text><line x1="20" y1="390" x2="980" y2="390" class="axis"/><rect x="20.0" y="355" width="70.0" height="70" rx="4" class="s-neutral"><title>Working turn</title></rect><text x="55" y="465" class="lbl sub" text-anchor="middle">turn</text><rect x="354.0" y="385" width="12.0" height="10" rx="4" class="s-1"><title>Ping: a cache read at 0.1x input</title></rect><text x="360" y="465" class="lbl s1" text-anchor="middle">ping</text><rect x="634.0" y="385" width="12.0" height="10" rx="4" class="s-1"><title>Ping: a cache read at 0.1x input</title></rect><text x="640" y="465" class="lbl s1" text-anchor="middle">ping</text><rect x="880.0" y="385" width="100.0" height="10" rx="4" class="s-1"><title>You come back: the prefix is still cached, 0.1x input</title></rect><text x="980" y="465" class="lbl s1" text-anchor="end">back: cheap read</text><text x="20" y="530" class="lbl sub" text-anchor="start">Bar height is cost. 2 hours idle, 193k-token context.</text></svg></figure>
-      <p>The fix is a keep-alive. Just before the cache expires, resend the thread's last request byte for byte, with <code>max_tokens: 0</code>. You get no answer back. The provider reads the cached prefix, and that read resets the expiry clock.</p>
+      <figure class="chart" id="calc">
+        <div class="controls">
+          <label>Model <select id="c-model"><option value="fable">Fable 5.1</option><option value="opus">Opus 5.5</option><option value="sonnet">Sonnet 5</option></select></label>
+          <label>Cache <select id="c-ttl"><option value="3600">1 hour</option><option value="300">5 minutes</option></select></label>
+          <label>Context <input id="c-ctx" type="range" min="20" max="1000" step="10" value="200" /> <output id="c-ctx-o"></output></label>
+          <label>Away <input id="c-away" type="range" min="5" max="1440" step="5" value="150" /> <output id="c-away-o"></output></label>
+        </div>
+        <svg id="c-svg" viewBox="0 0 1000 470" role="img" aria-label="Timeline of one idle thread with and without keep-alive pings"></svg>
+        <div class="readout" id="c-read"></div>
+      </figure>
+      <p>The fix is a keep-alive. Just before the cache expires, resend the thread's last request byte for byte, with <code>max_tokens: 0</code>. You get no answer back. The provider reads the cached prefix, and that read resets the expiry clock. Drag the sliders above to see when it pays.</p>
 
       <h2>When it pays</h2>
-      <p>Every ping is a cache read. At some point the pings add up to more than the rewrite they're preventing. Context size cancels out, so the break-even point depends only on the price ratio and how often you ping.</p>
-      <figure class="chart"><svg viewBox="0 0 1000 380" role="img" aria-label="Break-even idle time: 46 minutes for Claude 5-minute cache, 5.4 hours for GPT-6, 17 hours for Claude 1-hour cache"><line x1="330.0" y1="10" x2="330.0" y2="330" class="grid"/><text x="330.0" y="365" class="lbl sub" text-anchor="middle">0 h</text><line x1="516.6666666666666" y1="10" x2="516.6666666666666" y2="330" class="grid"/><text x="516.6666666666666" y="365" class="lbl sub" text-anchor="middle">6 h</text><line x1="703.3333333333333" y1="10" x2="703.3333333333333" y2="330" class="grid"/><text x="703.3333333333333" y="365" class="lbl sub" text-anchor="middle">12 h</text><line x1="890.0" y1="10" x2="890.0" y2="330" class="grid"/><text x="890.0" y="365" class="lbl sub" text-anchor="middle">18 h</text><text x="310" y="70" class="lbl" text-anchor="end">Claude, 5-min cache</text><rect x="330.0" y="30" width="24.0" height="56" rx="4" class="s-1"><title>Claude, 5-min cache: pings stop paying off after 46 min idle</title></rect><text x="367.9555555555556" y="70" class="lbl strong" text-anchor="start">46 min</text><text x="310" y="170" class="lbl" text-anchor="end">GPT-6, 30-min cache</text><rect x="330.0" y="130" width="168.0" height="56" rx="4" class="s-1"><title>GPT-6, 30-min cache: pings stop paying off after 5.4 h idle</title></rect><text x="512.0" y="170" class="lbl strong" text-anchor="start">5.4 h</text><text x="310" y="270" class="lbl" text-anchor="end">Claude, 1-hour cache</text><rect x="330.0" y="230" width="541.3" height="56" rx="4" class="s-1"><title>Claude, 1-hour cache: pings stop paying off after 17 h idle</title></rect><text x="885.3333333333333" y="270" class="lbl strong" text-anchor="start">17 h</text></svg></figure>
-      <p>So a keep-alive needs a cutoff. Past it, stop pinging and take the cold write.</p>
+      <p>Every ping is a cache read. Keep pinging long enough and the pings cost more than the rewrite. Context size cancels out, so break-even depends only on the price ratio and how often you ping. Fable 5.1 reads are 1/80th the price of a 1-hour write, which buys a lot of pings.</p>
+      <figure class="chart"><svg viewBox="0 0 1000 550" role="img" aria-label="Break-even time away by model and cache"><line x1="360.0" y1="10" x2="360.0" y2="500" class="grid"/><text x="360.0" y="535" class="lbl sub" text-anchor="middle">0 h</text><line x1="546.6666666666666" y1="10" x2="546.6666666666666" y2="500" class="grid"/><text x="546.6666666666666" y="535" class="lbl sub" text-anchor="middle">24 h</text><line x1="733.3333333333333" y1="10" x2="733.3333333333333" y2="500" class="grid"/><text x="733.3333333333333" y="535" class="lbl sub" text-anchor="middle">48 h</text><line x1="920.0" y1="10" x2="920.0" y2="500" class="grid"/><text x="920.0" y="535" class="lbl sub" text-anchor="middle">72 h</text><text x="340" y="63" class="lbl" text-anchor="end">Fable 5.1, 1-hour cache</text><rect x="360.0" y="25" width="563.2" height="52" rx="4" class="s-1" data-tip="Fable 5.1, 1-hour cache: pings beat a rewrite for up to 72 h away"/><text x="937.2407407407408" y="63" class="lbl strong" text-anchor="start">72 h</text><text x="340" y="158" class="lbl" text-anchor="end">Opus 5.5, 1-hour cache</text><rect x="360.0" y="120" width="278.1" height="52" rx="4" class="s-1" data-tip="Opus 5.5, 1-hour cache: pings beat a rewrite for up to 36 h away"/><text x="652.0555555555555" y="158" class="lbl strong" text-anchor="start">36 h</text><text x="340" y="253" class="lbl" text-anchor="end">Sonnet 5, 1-hour cache</text><rect x="360.0" y="215" width="135.5" height="52" rx="4" class="s-1" data-tip="Sonnet 5, 1-hour cache: pings beat a rewrite for up to 17 h away"/><text x="509.46296296296293" y="253" class="lbl strong" text-anchor="start">17 h</text><text x="340" y="348" class="lbl" text-anchor="end">GPT-6, 30-min cache</text><rect x="360.0" y="310" width="41.7" height="52" rx="4" class="s-1" data-tip="GPT-6, 30-min cache: pings beat a rewrite for up to 5.4 h away"/><text x="415.74074074074076" y="348" class="lbl strong" text-anchor="start">5.4 h</text><text x="340" y="443" class="lbl" text-anchor="end">Fable 5.1, 5-min cache</text><rect x="360.0" y="405" width="25.4" height="52" rx="4" class="s-1" data-tip="Fable 5.1, 5-min cache: pings beat a rewrite for up to 3.3 h away"/><text x="399.4074074074074" y="443" class="lbl strong" text-anchor="start">3.3 h</text></svg></figure>
 
-      <h2>What it would have saved</h2>
-      <p>I replayed two weeks of my own Claude Code and Codex transcripts, September 9 to 23, with a 24-hour cutoff.</p>
-      <figure class="chart"><svg viewBox="0 0 1000 330" role="img" aria-label="Keep-alive would have saved $336 of $2,802 in Claude spend"><text x="20" y="60" class="big s1" text-anchor="start">$336 saved</text><text x="980" y="60" class="lbl sub" text-anchor="end">$2,466 still spent</text><rect x="20.0" y="90" width="113.0" height="110" rx="4" class="s-1"><title>Saved by keep-alive: $335.68</title></rect><rect x="137.0" y="90" width="843.0" height="110" rx="4" class="s-track"><title>Still spent: $2,466</title></rect><text x="20" y="260" class="lbl strong" text-anchor="start">12% of Claude spend, from 92 cache expiries</text><text x="20" y="305" class="lbl sub" text-anchor="start">Perfect foresight: $343. Codex on the same data: $8.73.</text></svg></figure>
-      <p>Most of the saving came from a few long engineering threads with contexts of several hundred thousand tokens, left idle for one to four hours. Codex barely moved. Its contexts are cheaper and I'm on a flat-rate plan, so even the $8.73 is a rate-card figure, not money I'd get back.</p>
+      <h2>The catch: threads you never come back to</h2>
+      <p>Break-even assumes you return. Often you don't. A keep-alive can't tell a lunch break from a finished task, so it pings abandoned threads too. That's what the cutoff is for. I replayed every idle gap in two weeks of my Claude Code transcripts, 9 to 23 September, including the 297 threads that went quiet for good.</p>
+      <figure class="chart" id="cut">
+        <svg id="cut-svg" viewBox="0 0 1000 420" role="img" aria-label="Net savings by cutoff: best at 3 hours, $215"></svg>
+        <div class="controls"><label>Stop pinging after <input id="cut-h" type="range" min="1" max="36" step="1" value="3" /> <output id="cut-o"></output></label></div>
+      </figure>
+      <p>The best cutoff was 3 hours: $215 saved, 7% of my $3,101 cache spend. Past 13 hours it loses money. At 24 hours it costs $185. Perfect foresight, pinging only threads I'd come back to, would have saved $399.</p>
 
-      <h2>Don't just lengthen the cache</h2>
-      <p>Claude offers a 1-hour cache, but writing to it costs 2x input instead of 1.25x. Every new token in a growing thread pays that higher price. Forcing one cache length on everything made spend go up.</p>
-      <figure class="chart"><svg viewBox="0 0 1000 380" role="img" aria-label="Change in two-week Claude spend: today's mix plus pings saves $336, 1-hour everywhere costs $24 more, 5-minute everywhere costs $205 more"><line x1="560" y1="10" x2="560" y2="330" class="axis-strong"/><text x="560" y="365" class="lbl sub" text-anchor="middle">$0</text><rect x="140.0" y="30" width="420.0" height="56" rx="4" class="s-1"><title>Today's mix + pings: $336 less</title></rect><text x="126.0" y="70" class="lbl strong" text-anchor="end">-$336</text><text x="580" y="70" class="lbl" text-anchor="start">Today's mix + pings</text><rect x="560.0" y="130" width="30.0" height="56" rx="4" class="s-2"><title>1-hour everywhere + pings: $24 more</title></rect><text x="604.0" y="170" class="lbl strong" text-anchor="start">+$24</text><text x="540" y="170" class="lbl" text-anchor="end">1-hour everywhere + pings</text><rect x="560.0" y="230" width="256.2" height="56" rx="4" class="s-2"><title>5-min everywhere + pings: $205 more</title></rect><text x="830.25" y="270" class="lbl strong" text-anchor="start">+$205</text><text x="540" y="270" class="lbl" text-anchor="end">5-min everywhere + pings</text></svg></figure>
+      <h2>Every cold return</h2>
+      <p>Each dot is one time I came back to an expired cache. Size is context. The cutoff slider above moves the line.</p>
+      <figure class="chart" id="ev">
+        <svg id="ev-svg" viewBox="0 0 1000 470" role="img" aria-label="Timeline of 119 cache expiries, 9 to 23 September"></svg>
+        <div class="readout" id="ev-read"></div>
+      </figure>
+
+      <h2>Don't shorten the cache</h2>
+      <p>Pinging a 5-minute cache means a ping every 4 minutes. Most of my threads already used the 1-hour cache, so forcing it everywhere changed almost nothing. Forcing 5 minutes was a disaster.</p>
+      <figure class="chart"><svg viewBox="0 0 1000 380" role="img" aria-label="Change in two-week spend by cache policy at a 3-hour cutoff"><line x1="400" y1="10" x2="400" y2="330" class="axis-strong"/><text x="400" y="365" class="lbl sub" text-anchor="middle">$0</text><rect x="303.2" y="30" width="96.8" height="56" rx="4" class="s-1" data-tip="Today's mix + pings: $215 saved"/><text x="289.205" y="70" class="lbl strong" text-anchor="end">-$215</text><text x="420" y="70" class="lbl" text-anchor="start">Today's mix + pings</text><rect x="303.6" y="130" width="96.4" height="56" rx="4" class="s-1" data-tip="1-hour everywhere + pings: $214 saved"/><text x="289.556" y="170" class="lbl strong" text-anchor="end">-$214</text><text x="420" y="170" class="lbl" text-anchor="start">1-hour everywhere + pings</text><rect x="400.0" y="230" width="379.4" height="56" rx="4" class="s-2" data-tip="5-min everywhere + pings: $843 extra"/><text x="793.395" y="270" class="lbl strong" text-anchor="start">+$843</text><text x="380" y="270" class="lbl" text-anchor="end">5-min everywhere + pings</text></svg></figure>
 
       <h2>What pings can't fix</h2>
-      <p>A ping keeps the old prefix alive. It can't help once the prefix itself changes, whether from compaction, an edited system prompt, a model switch, or new tool definitions. In my data that was the small slice.</p>
-      <figure class="chart"><svg viewBox="0 0 1000 280" role="img" aria-label="Claude cache-write dollars: 38% expired while idle, 3.5% invalidated, 58.5% everything else"><rect x="20.0" y="20" width="361.8" height="130" rx="4" class="s-1"><title>38% expired while idle: pings fix most of this</title></rect><text x="20" y="215" class="lbl strong" text-anchor="start">38% expired while idle</text><text x="20" y="258" class="lbl sub" text-anchor="start">pings fix most of this</text><rect x="384.8" y="20" width="30.6" height="130" rx="4" class="s-2"><title>3.5% invalidated: pings can't help</title></rect><text x="440" y="215" class="lbl strong" text-anchor="middle">3.5% invalidated</text><text x="440" y="258" class="lbl sub" text-anchor="middle">pings can't help</text><rect x="418.4" y="20" width="558.6" height="130" rx="4" class="s-track"><title>58.5% everything else: mostly new context</title></rect><text x="980" y="215" class="lbl strong" text-anchor="end">58.5% everything else</text><text x="980" y="258" class="lbl sub" text-anchor="end">mostly new context</text><line x1="402" y1="155" x2="440" y2="180" class="axis-strong"/></svg></figure>
+      <p>A ping keeps the old prefix alive. It can't help once the prefix changes, whether from compaction, an edited system prompt, a model switch, or new tool definitions. In my data that barely happened.</p>
+      <figure class="chart"><svg viewBox="0 0 1000 280" role="img" aria-label="Share of cache-write dollars"><rect x="20.0" y="20" width="305.2" height="130" rx="4" class="s-1" data-tip="32% expired while idle: pings can fix this"/><text x="20" y="215" class="lbl strong" text-anchor="start">32% expired while idle</text><text x="20" y="258" class="lbl sub" text-anchor="start">pings can fix this</text><rect x="328.2" y="20" width="0.8" height="130" rx="4" class="s-2" data-tip="0.2% invalidated: pings can't"/><text x="440" y="215" class="lbl strong" text-anchor="middle">0.2% invalidated</text><text x="440" y="258" class="lbl sub" text-anchor="middle">pings can't</text><rect x="332.0" y="20" width="645.0" height="130" rx="4" class="s-track" data-tip="68% everything else: mostly new context"/><text x="980" y="215" class="lbl strong" text-anchor="end">68% everything else</text><text x="980" y="258" class="lbl sub" text-anchor="end">mostly new context</text><line x1="328" y1="155" x2="440" y2="180" class="axis-strong"/></svg></figure>
 
       <h2>Building it</h2>
       <ul>
         <li>Save the exact bytes of each idle thread's last request.</li>
         <li>Replay them just before expiry, asking for zero output.</li>
-        <li>Stop at the break-even cutoff, and skip contexts too small to be worth it.</li>
+        <li>Stop after a few hours. The cutoff matters more than anything else.</li>
+        <li>Skip small contexts and subagents.</li>
         <li>Keep pings out of thread history. They're cache traffic, not turns.</li>
-        <li>Log each miss as expiry or invalidation, so you tune the right thing.</li>
       </ul>
-      <p>For a big thread you come back to after lunch, a few cents of pings saves a few dollars of rewrite.</p>
+      <p>For a big thread you come back to after lunch, a few cents of pings saves a few dollars of rewrite. For a thread you've finished with, every ping is wasted money. Stop early.</p>
 
       <footer class="article-footer">
-        <p>Claude figures are estimated cash cost. Codex figures use API list prices. Break-even assumes reads at 0.1x input, writes at 1.25x (5-minute and OpenAI) or 2x (1-hour), and pings every 4, 28, and 55 minutes. Hover any bar for its value.</p>
+        <p>Method: Claude Code transcripts, 9 to 23 September 2026, deduplicated by request. List prices from Anthropic's rate card: Fable 5.1 at $10/M input, $0.25/M cache read, $20/M 1-hour write. Pings every 55 minutes on 1-hour caches and 4 minutes on 5-minute ones. Contexts under 20k tokens are never pinged. Times are Sydney (AEST). Cache spend counts cache reads and writes only. Hover or tap anything for exact values.</p>
+        <p>Corrected 24 September: the first version of this post ignored pings sent after a thread's last message and claimed $336 saved at a 24-hour cutoff. Counting them, that cutoff loses money.</p>
       </footer>
     </article>
   </main></div></div>
+  <div class="tip" id="tip" hidden></div>
+  <script>
+  (() => {
+    const D = {"curve":[-31.13,154.63,215.1,208.2,203.45,188.54,169.02,144.42,123.29,104.16,60.66,36.36,19.72,-4.1,-27.63,-44.95,-65.75,-78.92,-85.42,-96.24,-113.93,-151.24,-168.49,-185.36,-200.32,-221.32,-242.32,-263.32,-284.32,-305.32,-326.32,-347.32,-384.18,-405.18,-426.18,-447.18,-468.07,-488.96,-509.86,-530.75,-551.64,-572.53,-593.42,-630.06,-650.95,-671.84,-692.73,-713.62,-734.51,-755.41,-776.3,-797.19,-818.08,-838.97,-875.61,-894.45,-914.22,-934.96,-955.7,-976.44,-997.17,-1017.91,-1038.65,-1059.39,-1080.02,-1116.15,-1136.78,-1157.41,-1178.05,-1198.68,-1219.24,-1239.81],"events":[{"t":1788912725,"gap":64656,"P":58649,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789024876,"gap":4831,"P":170191,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789035840,"gap":754,"P":85635,"m":"opus-5","r":5e-07,"w":6.25e-06,"p":240},{"t":1789099931,"gap":9150,"P":88851,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789115527,"gap":14619,"P":245946,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789280680,"gap":200307,"P":36615,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789280682,"gap":202032,"P":50687,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789280684,"gap":199934,"P":65910,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789428034,"gap":74768,"P":116799,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789429929,"gap":67159,"P":253268,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789433837,"gap":5384,"P":153021,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789435711,"gap":71670,"P":273236,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789435839,"gap":4930,"P":287321,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789438156,"gap":7096,"P":146919,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789438198,"gap":7514,"P":121753,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789445353,"gap":9516,"P":165188,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789453320,"gap":15571,"P":180900,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789454779,"gap":16285,"P":173602,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789510842,"gap":54423,"P":279341,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789515025,"gap":45535,"P":382821,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789515595,"gap":4626,"P":288640,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789522033,"gap":70268,"P":269342,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789522047,"gap":3680,"P":331541,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789523721,"gap":5009,"P":497802,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789524816,"gap":8103,"P":82229,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789536940,"gap":4177,"P":320615,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789549022,"gap":7659,"P":416849,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789550154,"gap":5661,"P":403732,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789601123,"gap":62524,"P":405271,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789605985,"gap":4857,"P":394684,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789616749,"gap":6131,"P":227112,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789689284,"gap":67287,"P":117687,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789694080,"gap":66646,"P":110235,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789702860,"gap":4486,"P":67515,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789707232,"gap":8976,"P":251277,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789707243,"gap":11170,"P":159465,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789707399,"gap":9132,"P":229990,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789725281,"gap":9771,"P":377559,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789777205,"gap":74344,"P":67929,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789799646,"gap":4193,"P":114159,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789863607,"gap":86381,"P":70923,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789864938,"gap":66897,"P":190313,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789865030,"gap":65349,"P":130384,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789870303,"gap":4581,"P":155310,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789871158,"gap":5799,"P":163083,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789878638,"gap":7694,"P":335786,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789878641,"gap":7448,"P":184645,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789878675,"gap":7431,"P":180765,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789883200,"gap":4377,"P":196716,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789890668,"gap":7451,"P":201208,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789894623,"gap":3854,"P":217486,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789910441,"gap":15791,"P":224371,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789954137,"gap":4516,"P":254029,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789955801,"gap":3778,"P":305724,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789962105,"gap":7513,"P":102121,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789967142,"gap":4419,"P":72041,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789968358,"gap":8302,"P":71382,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789969472,"gap":4310,"P":187406,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789980661,"gap":5824,"P":318383,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789984367,"gap":9794,"P":99770,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789985339,"gap":4906,"P":349818,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789985922,"gap":9239,"P":165242,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1789996092,"gap":9000,"P":49221,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1789997612,"gap":4165,"P":422479,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790001586,"gap":11411,"P":236696,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790001815,"gap":11650,"P":97063,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790005187,"gap":7221,"P":444845,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790008654,"gap":3903,"P":136966,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790012367,"gap":7045,"P":462763,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790024205,"gap":22280,"P":258648,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790024228,"gap":33120,"P":268225,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790024264,"gap":15493,"P":153751,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790030610,"gap":6338,"P":272860,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790032279,"gap":83377,"P":145431,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790032354,"gap":7319,"P":176145,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790032361,"gap":30027,"P":182842,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1790032374,"gap":19185,"P":495198,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790038408,"gap":4214,"P":198937,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790038932,"gap":4310,"P":64969,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790047850,"gap":4094,"P":399578,"m":"fable-5","r":1e-06,"w":2e-05,"p":3300},{"t":1790048518,"gap":5325,"P":90125,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790049127,"gap":5529,"P":668429,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790049403,"gap":5514,"P":221197,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790049404,"gap":6461,"P":244320,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790049455,"gap":4779,"P":471624,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790051446,"gap":81944,"P":199042,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790054095,"gap":86499,"P":155626,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790055969,"gap":4637,"P":175477,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790056785,"gap":6818,"P":289268,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790056972,"gap":5586,"P":217675,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790057943,"gap":3816,"P":160988,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790059189,"gap":7547,"P":87775,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790061300,"gap":4491,"P":294682,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790118535,"gap":58337,"P":203472,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790122816,"gap":4451,"P":130036,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790125454,"gap":4963,"P":128450,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790130132,"gap":5818,"P":175279,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790130187,"gap":4042,"P":95646,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790132382,"gap":7941,"P":133938,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790137945,"gap":13885,"P":87128,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790138250,"gap":781,"P":206820,"m":"opus-5-5","r":2e-07,"w":5e-06,"p":240},{"t":1790138338,"gap":87401,"P":152305,"m":"fable-5-1","r":2.5e-07,"w":2e-05,"p":3300},{"t":1790138407,"gap":6865,"P":178898,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790138533,"gap":13075,"P":145439,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790138716,"gap":465,"P":208089,"m":"opus-5-5","r":2e-07,"w":5e-06,"p":240},{"t":1790138761,"gap":13092,"P":199574,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790138789,"gap":12869,"P":79420,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790138815,"gap":7349,"P":220652,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790139379,"gap":547,"P":225880,"m":"opus-5-5","r":2e-07,"w":5e-06,"p":240},{"t":1790141563,"gap":16315,"P":98588,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790141713,"gap":985,"P":276573,"m":"opus-5-5","r":2e-07,"w":5e-06,"p":240},{"t":1790143480,"gap":10821,"P":189356,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790144382,"gap":2565,"P":293031,"m":"opus-5-5","r":2e-07,"w":5e-06,"p":240},{"t":1790146167,"gap":3695,"P":337913,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790148891,"gap":9513,"P":228106,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790151119,"gap":9360,"P":279127,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790161133,"gap":8580,"P":296098,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790164199,"gap":13340,"P":263330,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300},{"t":1790172882,"gap":9531,"P":311281,"m":"opus-5-5","r":2e-07,"w":8e-06,"p":3300}],"best":3};
+    const NS = "http://www.w3.org/2000/svg";
+    const TZ = 10 * 3600; // AEST, no DST until 4 October
+    const $ = (id) => document.getElementById(id);
+    const el = (tag, attrs, text) => {
+      const n = document.createElementNS(NS, tag);
+      for (const k in attrs) n.setAttribute(k, attrs[k]);
+      if (text != null) n.textContent = text;
+      return n;
+    };
+    const money = (v) => (v < 0 ? "-$" : "$") + Math.abs(v).toFixed(Math.abs(v) < 10 ? 2 : 0);
+    const dur = (s) => {
+      const m = Math.round(s / 60), h = Math.floor(m / 60), d = Math.floor(h / 24);
+      if (d >= 1) return d + "d " + (h % 24) + "h";
+      return h ? h + "h " + String(m % 60).padStart(2, "0") + "m" : m + "m";
+    };
+    const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const local = (t) => new Date((t + TZ) * 1000);
+    const clock = (d) => {
+      const h = d.getUTCHours(), m = d.getUTCMinutes();
+      return ((h + 11) % 12 + 1) + ":" + String(m).padStart(2, "0") + (h < 12 ? " am" : " pm");
+    };
+    const stamp = (t) => { const d = local(t); return DAYS[d.getUTCDay()] + " " + d.getUTCDate() + " " + MONTHS[d.getUTCMonth()] + ", " + clock(d); };
+
+    // Shared tooltip: any element with data-tip.
+    const tip = $("tip");
+    const show = (e, html) => {
+      tip.innerHTML = html; tip.hidden = false;
+      const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8);
+      tip.style.left = x + "px"; tip.style.top = (e.clientY + 14) + "px";
+    };
+    document.addEventListener("pointermove", (e) => {
+      const n = e.target.closest && e.target.closest("[data-tip]");
+      if (n) show(e, n.getAttribute("data-tip")); else if (!e.target.closest("#cut-svg")) tip.hidden = true;
+    });
+
+    // 1. Calculator: one thread, one break, clock times on the axis.
+    const MODELS = { fable: { r: 0.25, w5: 12.5, w1: 20 }, opus: { r: 0.2, w5: 5, w1: 8 }, sonnet: { r: 0.2, w5: 2.5, w1: 4 } };
+    const START = 12 * 3600; // last turn at 12:00 pm
+    function calc() {
+      const m = MODELS[$("c-model").value], ttl = +$("c-ttl").value;
+      const P = +$("c-ctx").value * 1000, away = +$("c-away").value * 60;
+      const ping = ttl === 3600 ? 3300 : 240;
+      const w = ttl === 3600 ? m.w1 : m.w5;
+      $("c-ctx-o").textContent = (P >= 1e6 ? "1M" : P / 1000 + "k") + " tokens";
+      $("c-away-o").textContent = dur(away);
+      const rewrite = away > ttl ? P * w / 1e6 : P * m.r / 1e6;
+      const read = P * m.r / 1e6;
+      const n = Math.floor(away / ping);
+      const warm = (n + 1) * read;
+      const svg = $("c-svg"); svg.replaceChildren();
+      const x0 = 30, x1 = 970, span = away * 1.06;
+      const X = (s) => x0 + (x1 - x0) * s / span;
+      const steps = [900, 1800, 3600, 7200, 10800, 21600];
+      const step = steps.find((s) => span / s <= 7) || 21600;
+      const at = (s) => clock(new Date((START + s) * 1000));
+      for (let s = 0; s <= span; s += step) {
+        svg.append(el("line", { x1: X(s), y1: 20, x2: X(s), y2: 420, class: "grid" }));
+        svg.append(el("text", { x: X(s), y: 455, class: "lbl sub", "text-anchor": s ? "middle" : "start" }, at(s)));
+      }
+      const H = 150, hw = Math.max(H * rewrite / Math.max(rewrite, warm), 3), hr = Math.max(H * read / Math.max(rewrite, warm), 8);
+      const lane = (y, name) => {
+        svg.append(el("text", { x: x0, y: y - 95, class: "lbl strong" }, name));
+        svg.append(el("line", { x1: x0, y1: y, x2: x1, y2: y, class: "axis" }));
+        svg.append(Object.assign(el("rect", { x: X(0), y: y - 20, width: 14, height: 40, rx: 3, class: "s-neutral", "data-tip": "Last turn, " + at(0) })));
+      };
+      lane(150, "Without keep-alive"); lane(370, "With keep-alive");
+      if (away > ttl) {
+        svg.append(el("line", { x1: X(ttl), y1: 110, x2: X(ttl), y2: 190, class: "axis-strong", "stroke-dasharray": "6 6" }));
+        svg.append(el("text", { x: X(ttl) + 8, y: 205, class: "lbl sub" }, "cache expires " + at(ttl)));
+      }
+      svg.append(el("rect", { x: X(away) - 8, y: 150 - hw / 2, width: 16, height: hw, rx: 3, class: away > ttl ? "s-2" : "s-1",
+        "data-tip": "Back at " + at(away) + (away > ttl ? ": full rewrite, " : ": still cached, ") + money(rewrite) }));
+      for (let k = 1; k <= n; k++) {
+        svg.append(el("rect", { x: X(k * ping) - 3, y: 370 - hr / 2, width: 8, height: hr, rx: 2, class: "s-1",
+          "data-tip": "Ping " + k + " at " + at(k * ping) + ": " + money(read) }));
+        if (n <= 5) svg.append(el("text", { x: X(k * ping), y: 410, class: "lbl s1", "text-anchor": "middle" }, at(k * ping)));
+      }
+      svg.append(el("rect", { x: X(away) - 8, y: 370 - hr / 2, width: 16, height: hr, rx: 3, class: "s-1",
+        "data-tip": "Back at " + at(away) + ": cheap read, " + money(read) }));
+      const diff = rewrite - warm;
+      $("c-read").innerHTML =
+        "<div><span class='metric-label'>without</span><b>" + money(rewrite) + "</b></div>" +
+        "<div><span class='metric-label'>with " + n + " ping" + (n === 1 ? "" : "s") + "</span><b>" + money(warm) + "</b></div>" +
+        "<div><span class='metric-label'>" + (diff >= 0 ? "keep-alive saves" : "keep-alive costs") + "</span><b class='" + (diff >= 0 ? "s1" : "s2") + "'>" + money(Math.abs(diff)) + "</b></div>";
+    }
+    ["c-model", "c-ttl", "c-ctx", "c-away"].forEach((id) => $(id).addEventListener("input", calc));
+    calc();
+
+    // 2. Cutoff curve and 3. event timeline, linked by the cutoff.
+    const cut = $("cut-h");
+    const eventValue = (e, Hs) => e.gap <= Hs
+      ? e.P * (e.w - e.r) / 1 - Math.floor(e.gap / e.p) * e.P * e.r
+      : -Math.floor(Hs / e.p) * e.P * e.r;
+    function drawCut() {
+      const H = +cut.value, svg = $("cut-svg"); svg.replaceChildren();
+      $("cut-o").textContent = H + " h";
+      const c = D.curve.slice(0, 36), lo = -600, hi = 300;
+      const X = (h) => 110 + 860 * (h - 1) / 35, Y = (v) => 30 + 320 * (hi - Math.max(lo, Math.min(hi, v))) / (hi - lo);
+      for (const v of [-600, -450, -300, -150, 0, 150, 300]) {
+        svg.append(el("line", { x1: 110, y1: Y(v), x2: 970, y2: Y(v), class: v ? "grid" : "axis-strong" }));
+        svg.append(el("text", { x: 96, y: Y(v) + 9, class: "lbl sub", "text-anchor": "end" }, v > 0 ? "+$" + v : v < 0 ? "-$" + -v : "$0"));
+      }
+      for (const h of [1, 6, 12, 18, 24, 30, 36]) svg.append(el("text", { x: X(h), y: 395, class: "lbl sub", "text-anchor": "middle" }, h + " h"));
+      svg.append(el("text", { x: 110, y: 20, class: "lbl sub" }, "saved"));
+      let d = "";
+      c.forEach((v, i) => { d += (i ? "L" : "M") + X(i + 1).toFixed(1) + " " + Y(v).toFixed(1); });
+      svg.append(el("path", { d, class: "line" }));
+      svg.append(el("circle", { cx: X(D.best), cy: Y(c[D.best - 1]), r: 6, class: "s-1" }));
+      svg.append(el("text", { x: X(D.best) + 14, y: Y(c[D.best - 1]) - 12, class: "lbl strong" }, "best: " + D.best + " h, " + money(c[D.best - 1])));
+      svg.append(el("line", { x1: X(H), y1: 30, x2: X(H), y2: 350, class: "axis", "stroke-dasharray": "4 6" }));
+      svg.append(el("circle", { cx: X(H), cy: Y(c[H - 1]), r: 8, class: c[H - 1] >= 0 ? "s-1 ring" : "s-2 ring" }));
+      const hit = el("rect", { x: 110, y: 20, width: 860, height: 340, fill: "transparent" });
+      const pick = (e) => {
+        const b = svg.getBoundingClientRect();
+        const h = Math.round(1 + 35 * ((e.clientX - b.left) / b.width * 1000 - 110) / 860);
+        cut.value = Math.max(1, Math.min(36, h)); update();
+        show(e, "Stop after " + cut.value + " h: " + (c[cut.value - 1] >= 0 ? "saves " : "costs ") + money(Math.abs(c[cut.value - 1])));
+      };
+      hit.addEventListener("pointermove", pick);
+      hit.addEventListener("pointerleave", () => { tip.hidden = true; });
+      svg.append(hit);
+    }
+    function drawEvents() {
+      const Hs = +cut.value * 3600, svg = $("ev-svg"); svg.replaceChildren();
+      const t0 = Date.UTC(2026, 8, 9) / 1000 - TZ, t1 = Date.UTC(2026, 8, 24) / 1000 - TZ;
+      const X = (t) => 70 + 900 * (t - t0) / (t1 - t0);
+      const lg = (s) => Math.log(Math.max(s, 3600) / 3600), top = Math.log(120);
+      const Y = (s) => 390 - 360 * Math.min(lg(s), top) / top;
+      for (const [s, l] of [[3600, "1h"], [3 * 3600, "3h"], [12 * 3600, "12h"], [86400, "1d"], [4 * 86400, "4d"]]) {
+        svg.append(el("line", { x1: 70, y1: Y(s), x2: 970, y2: Y(s), class: "grid" }));
+        svg.append(el("text", { x: 58, y: Y(s) + 8, class: "lbl sub", "text-anchor": "end" }, l));
+      }
+      for (let d = 0; d <= 15; d++) {
+        const t = t0 + d * 86400, day = local(t);
+        svg.append(el("line", { x1: X(t), y1: 20, x2: X(t), y2: 395, class: "grid" }));
+        if (d % 2 === 0 && d < 15) svg.append(el("text", { x: X(t) + 4, y: 430, class: "lbl sub" }, DAYS[day.getUTCDay()] + " " + day.getUTCDate()));
+      }
+      svg.append(el("text", { x: 70, y: 462, class: "lbl sub" }, "September, Sydney time. Height: time away."));
+      svg.append(el("line", { x1: 70, y1: Y(Hs), x2: 970, y2: Y(Hs), class: "axis-strong", "stroke-dasharray": "8 6" }));
+      svg.append(el("text", { x: 76, y: Y(Hs) - 10, class: "lbl strong" }, "cutoff " + cut.value + " h"));
+      let caught = 0, gain = 0;
+      for (const e of D.events) {
+        const v = eventValue(e, Hs), ok = e.gap <= Hs;
+        if (ok) { caught++; gain += v; }
+        const tipText = "<b>" + stamp(e.t) + "</b><br>away " + dur(e.gap) + " · " + Math.round(e.P / 1000) + "k tokens · " + e.m.replace("fable-5-1", "Fable 5.1").replace("opus-5-5", "Opus 5.5").replace("fable-5", "Fable 5").replace("opus-5", "Opus 5") +
+          "<br>" + (ok ? (v >= 0 ? "keep-alive saves " + money(v) : "pings cost " + money(-v) + " more than the rewrite") : "cutoff passed first: " + money(-v) + " of pings, then a " + money(e.P * e.w) + " rewrite");
+        svg.append(el("circle", { cx: X(e.t), cy: Y(e.gap), r: 4 + Math.sqrt(e.P / 1e6) * 16, class: "dot " + (ok ? "s-1" : "s-muted"), "data-tip": tipText }));
+      }
+      const net = D.curve[cut.value - 1], waste = gain - net;
+      $("ev-read").innerHTML =
+        "<div><span class='metric-label'>expiries caught</span><b>" + caught + " of " + D.events.length + "</b></div>" +
+        "<div><span class='metric-label'>saved on those</span><b class='s1'>" + money(gain) + "</b></div>" +
+        "<div><span class='metric-label'>other pings wasted</span><b class='s2'>" + money(waste) + "</b></div>";
+    }
+    function update() { drawCut(); drawEvents(); }
+    cut.addEventListener("input", update);
+    update();
+  })();
+  </script>
 </body>
 </html>
