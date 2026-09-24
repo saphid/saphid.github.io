@@ -72,14 +72,13 @@
             <option value="sonnet">Claude Sonnet 5</option>
           </select></label>
           <label>Cache <select id="c-ttl"><option value="3600">1 hour</option><option value="300">5 minutes</option></select></label>
-          <label>Context <input id="c-ctx" type="range" min="50" max="1000" step="50" value="200" /> <output id="c-ctx-o"></output></label>
           <span class="seg" id="c-range" role="group" aria-label="Time shown">
             <button type="button" data-h="4">4 h</button><button type="button" data-h="24" aria-pressed="true">1 day</button><button type="button" data-h="72">3 days</button>
           </span>
         </div>
         <div class="viz-head" id="c-head" aria-live="polite"></div>
         <svg id="c-svg" viewBox="0 0 760 360" role="img" aria-label="What your next message costs if you come back at a given time, with and without keep-alive"></svg>
-        <p class="viz-note">You stop at 12:00 pm. Hover or drag across the chart to pick when you come back.</p>
+        <p class="viz-note">A 200k-token context. You stop at 12:00 pm. Hover or drag to pick when you come back. A bigger context scales the dollars, not the shape.</p>
       </figure>
 
       <p>The orange line jumps once the cache expires. The blue staircase climbs by one cheap read per ping. Until the blue line catches the orange, keeping the cache warm is cheaper.</p>
@@ -149,8 +148,7 @@
 
     const W = 760, H = 360, L = 58, R = 740, T = 20, B = 310;
     function draw() {
-      const m = MODELS[$("c-model").value], ttl = +$("c-ttl").value, P = +$("c-ctx").value * 1000;
-      $("c-ctx-o").textContent = (P >= 1e6 ? "1M" : P / 1000 + "k") + " tokens";
+      const m = MODELS[$("c-model").value], ttl = +$("c-ttl").value, P = 200000;
       const ping = ttl === 3600 ? 3300 : 240;
       const read = P * m.r / 1e6, write = P * (ttl === 3600 ? m.w1 : m.w5) / 1e6;
       const cold = (s) => (s <= ttl ? read : write);
@@ -219,7 +217,7 @@
       hit.addEventListener("pointerdown", pick);
       svg.append(hit);
     }
-    ["c-model", "c-ttl", "c-ctx"].forEach((id) => $(id).addEventListener("input", draw));
+    ["c-model", "c-ttl"].forEach((id) => $(id).addEventListener("input", draw));
     $("c-range").addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
       for (const x of $("c-range").children) x.setAttribute("aria-pressed", x === b);
