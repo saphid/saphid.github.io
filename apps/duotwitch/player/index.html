@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Live player</title>
+  <style>
+    html, body { margin: 0; background: #000; width: 100%; height: 100%; }
+    #player { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+  <script src="https://player.twitch.tv/js/embed/v1.js"></script>
+  <script>
+    'use strict';
+    const parameters = new URLSearchParams(location.search);
+    const channel = parameters.get('channel') || '';
+    const session = parameters.get('session') || '';
+    if (/^[a-z0-9_]{1,25}$/.test(channel) && location.protocol === 'https:') {
+      const player = new Twitch.Player('player', {
+        width: '100%', height: '100%', channel,
+        parent: [location.hostname], autoplay: false, muted: false
+      });
+      window.duoPlayer = player;
+      const report = event => {
+        const handler = window.webkit && window.webkit.messageHandlers.mediaState;
+        if (handler) handler.postMessage({event, session});
+      };
+      ['READY', 'PLAYING', 'PAUSE', 'OFFLINE', 'ONLINE', 'PLAYBACK_BLOCKED', 'ENDED']
+        .forEach(event => player.addEventListener(Twitch.Player[event], () => report(event)));
+    }
+  </script>
+</body>
+</html>
